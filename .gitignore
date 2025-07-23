@@ -8,3 +8,7 @@ wheels/
 
 # Virtual environments
 .venv
+query_history_db.sqlite
+query_results/
+server.log
+.env

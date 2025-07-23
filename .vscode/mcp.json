@@ -1,0 +1,10 @@
+{
+  "servers": {
+    "redshift-mcp": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["--directory", "${workspaceFolder}", "run", "server.py"],
+      "envFile": "${workspaceFolder}/.env"
+    }
+  }
+}
