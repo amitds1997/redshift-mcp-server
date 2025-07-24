@@ -1,4 +1,3 @@
-
 import regex
 import sqlglot
 from sqlalchemy import literal
@@ -53,6 +52,7 @@ def validate_sql(sql: str) -> tuple[bool, str]:
         return False, f"{msg}\nInvalid SQL statement: {sql}"
 
     return True, "This is a read-only SQL statement."
+
 
 def quote_sql_literal(value) -> str:
     """Safely quote a SQL literal value."""

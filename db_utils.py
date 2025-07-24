@@ -45,11 +45,7 @@ class RedshiftDB:
             port=5439,
             query={"sslmode": "require"},
         )
-        engine = create_engine(
-            redshift_url,
-            echo=True,
-            future=True,
-        )
+        engine = create_engine(redshift_url)
         cls._instance = cls(engine, redshift_host)
         return cls._instance
 

@@ -1,4 +1,5 @@
 import time
+import warnings
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -7,7 +8,9 @@ from dotenv import load_dotenv
 from loguru import logger
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import Field
+from sqlalchemy.exc import SAWarning
 
+from cache_utils import cached_with_force_refresh
 from constants import (
     SVV_ALL_COLUMNS_QUERY,
     SVV_ALL_SCHEMAS_QUERY,
@@ -25,6 +28,10 @@ from utils import check_for_suspicious_sql, quote_sql_literal, validate_sql
 
 load_dotenv()
 
+
+warnings.filterwarnings(
+    "ignore", message=".*supports_statement_cache.*", category=SAWarning
+)
 
 logger.info("Logging initialized for Redshift MCP Server")
 
@@ -52,8 +59,15 @@ server = FastMCP("Redshift MCP Server", lifespan=app_lifespan)
     name="list_databases",
     description="Fetch all databases present in the Redshift cluster",
 )
-async def list_database_tool(ctx: Context) -> list[RedshiftDatabase]:
-    """List all databases in the Redshift cluster
+@cached_with_force_refresh(ttl=3600, force_arg_name="force_refresh")
+async def list_database_tool(
+    ctx: Context,
+    force_refresh: bool = Field(
+        False,
+        description="Query Redshift again to refresh the cached result. By default, cached results are used. Cache time is 1 hour.",
+    ),
+) -> list[RedshiftDatabase]:
+    """List all databases in the Redshift cluster.
 
     This tool queries SVV_REDSHIFT_DATABASES to retrieve all database information that the user has access to.
 
@@ -98,11 +112,16 @@ async def list_database_tool(ctx: Context) -> list[RedshiftDatabase]:
     name="list_schemas",
     description="Fetch all Redshift schemas in database and return it in structured format",
 )
+@cached_with_force_refresh(ttl=3600, force_arg_name="force_refresh")
 async def list_schemas_tool(
     ctx: Context,
     db_name: str = Field(
         ...,
         description="The database name to list schemas for. Must be a valid database name from the list_databases tool.",
+    ),
+    force_refresh: bool = Field(
+        False,
+        description="Query Redshift again to refresh the cached result. By default, cached results are used. Cache time is 1 hour.",
     ),
 ) -> list[RedshiftSchema]:
     """List all schemas in a specified database within the Redshift cluster
@@ -143,6 +162,10 @@ async def list_schemas_tool(
     """
     db: RedshiftDB = ctx.request_context.lifespan_context.db
 
+    if db_name is None or db_name == "":
+        await ctx.error("Database name must be provided")
+        raise ValueError("Database name must be provided")
+
     try:
         logger.info(f"Listing schemas for database: {db_name} in cluster {db.host}")
         schema_data = await db.run_query(
@@ -170,6 +193,7 @@ async def list_schemas_tool(
     name="list_tables",
     description="Fetch all Redshift tables in a schema and return it in structured format",
 )
+@cached_with_force_refresh(ttl=3600, force_arg_name="force_refresh")
 async def list_tables_tool(
     ctx: Context,
     db_name: str = Field(
@@ -179,6 +203,10 @@ async def list_tables_tool(
     schema_name: str = Field(
         ...,
         description="The schema name to list tables for. Must be a valid schema name from the list_schemas tool.",
+    ),
+    force_refresh: bool = Field(
+        False,
+        description="Query Redshift again to refresh the cached result. By default, cached results are used. Cache time is 1 hour.",
     ),
 ) -> list[RedshiftTable]:
     """List all tables in a specified schema within the Redshift cluster
@@ -219,6 +247,16 @@ async def list_tables_tool(
     """
     db: RedshiftDB = ctx.request_context.lifespan_context.db
 
+    params = {
+        "Database name": db_name,
+        "Schema name": schema_name,
+    }
+    missing = [name for name, value in params.items() if value is None or value == ""]
+    if missing:
+        msg = ", ".join(missing) + " must be provided"
+        await ctx.error(msg)
+        raise ValueError(msg)
+
     try:
         logger.info(
             f"Listing tables for database: {db_name}, schema: {schema_name} in cluster {db.host}"
@@ -252,6 +290,7 @@ async def list_tables_tool(
     name="list_columns",
     description="Fetch all columns in a table within a schema in the Redshift cluster",
 )
+@cached_with_force_refresh(ttl=3600, force_arg_name="force_refresh")
 async def list_columns_tool(
     ctx: Context,
     db_name: str = Field(
@@ -265,6 +304,10 @@ async def list_columns_tool(
     table_name: str = Field(
         ...,
         description="The table name to list columns for. Must be a valid table name from the list_tables tool.",
+    ),
+    force_refresh: bool = Field(
+        False,
+        description="Query Redshift again to refresh the cached result. By default, cached results are used. Cache time is 1 hour.",
     ),
 ) -> list[RedshiftColumn]:
     """List all columns in a specified table within a schema in the Redshift cluster
@@ -312,6 +355,17 @@ async def list_columns_tool(
     6. Consider column remarks for additional context or documentation.
     """
     db: RedshiftDB = ctx.request_context.lifespan_context.db
+
+    params = {
+        "Database name": db_name,
+        "Schema name": schema_name,
+        "Table name": table_name,
+    }
+    missing = [name for name, value in params.items() if value is None or value == ""]
+    if missing:
+        msg = ", ".join(missing) + " must be provided"
+        await ctx.error(msg)
+        raise ValueError(msg)
 
     try:
         logger.info(

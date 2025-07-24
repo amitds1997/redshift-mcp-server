@@ -29,3 +29,7 @@ Has been tested up to 100+ rows of output. For larger output, your mileage may v
     ```
 
 3. In case you don't have `uv` installed, you can install it by following [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/).
+
+## Usage
+
+1. Prefer using a read-only user for connecting to the Redshift cluster. Validations are performed to ensure that the user is not able to execute DDL statements but it is still a good practice to use a read-only user.

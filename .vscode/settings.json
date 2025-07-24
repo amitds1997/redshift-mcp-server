@@ -3,5 +3,11 @@
   "python.testing.unittestArgs": ["-v", "-s", "./tests", "-p", "test_*.py"],
   "python.testing.pytestEnabled": false,
   "python.testing.unittestEnabled": true,
-  "cSpell.words": ["datashares", "fastmcp", "tablefmt"]
+  "cSpell.words": [
+    "aiocache",
+    "datashares",
+    "fastmcp",
+    "streamable",
+    "tablefmt"
+  ]
 }
